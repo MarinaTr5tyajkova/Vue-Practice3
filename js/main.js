@@ -68,18 +68,17 @@ Vue.component('kanban-board', {
                 const columnIndex = this.columns.findIndex(column => column.cards.includes(this.editingCard));
                 const cardIndex = this.columns[columnIndex].cards.indexOf(this.editingCard);
 
-                const updatedCard = {
+                
+                Vue.set(this.columns[columnIndex].cards, cardIndex, {
+                    ...this.editingCard,
                     title: this.modalData.title,
                     description: this.modalData.description,
                     deadline: this.modalData.deadline,
-                    createdAt: this.editingCard.createdAt,
-                    updatedAt: new Date(),
-                    status: this.editingCard.status
-                };
-
-                this.columns[columnIndex].cards[cardIndex] = updatedCard;
+                    updatedAt: new Date()
+                });
                 this.editingCard = null;
             } else {
+                
                 const card = {
                     title: this.modalData.title,
                     description: this.modalData.description,
@@ -155,8 +154,8 @@ Vue.component('kanban-card', {
                 <span class="sticker">{{ formattedDates }}</span>
             </div>
             <div class="card-body">
-                <p>{{ card.description }}</p>
-                <p v-if="card.updatedAt"><strong>Последнее изменение:</strong> {{ formatDate(card.updatedAt) }}</p>
+                <p><strong>Описание:</strong> {{ card.description }}</p>
+                <p v-if="card.updatedAt"><strong>Последнее изменение:</strong> {{ formatDate(card.updatedAt, true) }}</p>
             </div>
             <div class="card-actions">
                 <button @click="$emit('edit')">Редактировать</button>
@@ -166,15 +165,23 @@ Vue.component('kanban-card', {
     `,
     computed: {
         formattedDates() {
-            const createdAt = this.formatDate(this.card.createdAt);
-            const deadline = this.formatDate(this.card.deadline);
+            const createdAt = this.formatDate(this.card.createdAt); 
+            const deadline = this.formatDate(this.card.deadline); 
             return `${createdAt} – ${deadline}`;
         }
     },
     methods: {
-        formatDate(date) {
+        formatDate(date, includeTime = false) {
             const d = new Date(date);
-            const options = { day: 'numeric', month: 'short', year: 'numeric' };
+            const options = { 
+                day: 'numeric', 
+                month: 'short', 
+                year: 'numeric' 
+            };
+            if (includeTime) {
+                options.hour = '2-digit';
+                options.minute = '2-digit';
+            }
             return d.toLocaleDateString('ru-RU', options).replace('.', '');
         }
     }
