@@ -7,7 +7,10 @@ Vue.component('kanban-board', {
                 :title="column.title"
                 :cards="column.cards"
                 :is-first="index === 0"
+                :column-index="index"
                 @add-card="openModal"
+                @delete-card="deleteCard"
+                @edit-card="editCard"
             ></kanban-column>
 
             <kanban-modal
@@ -31,7 +34,8 @@ Vue.component('kanban-board', {
                 title: '',
                 description: '',
                 deadline: ''
-            }
+            },
+            editingCard: null
         };
     },
     methods: {
@@ -39,25 +43,68 @@ Vue.component('kanban-board', {
             this.columns[0].cards.push(card);
         },
         openModal() {
+            this.modalData = { title: '', description: '', deadline: '' };
+            this.editingCard = null;
             this.isModalOpen = true;
         },
         closeModal() {
             this.isModalOpen = false;
-            this.modalData = { title: '', description: '', deadline: '' }; 
+            this.modalData = { title: '', description: '', deadline: '' };
         },
         submitModal() {
-            if (this.modalData.title && this.modalData.description && this.modalData.deadline) {
+            if (!this.modalData.title || !this.modalData.description || !this.modalData.deadline) {
+                alert('Заполните все поля!');
+                return;
+            }
+
+            const deadline = new Date(this.modalData.deadline);
+            const today = new Date();
+            if (deadline < today) {
+                alert('Дедлайн не может быть раньше текущей даты!');
+                return;
+            }
+
+            if (this.editingCard) {
+                const columnIndex = this.columns.findIndex(column => column.cards.includes(this.editingCard));
+                const cardIndex = this.columns[columnIndex].cards.indexOf(this.editingCard);
+
+                const updatedCard = {
+                    title: this.modalData.title,
+                    description: this.modalData.description,
+                    deadline: this.modalData.deadline,
+                    createdAt: this.editingCard.createdAt,
+                    updatedAt: new Date(),
+                    status: this.editingCard.status
+                };
+
+                this.columns[columnIndex].cards[cardIndex] = updatedCard;
+                this.editingCard = null;
+            } else {
                 const card = {
-                    ...this.modalData,
-                    createdAt: new Date(), // Автоматическая дата создания
+                    title: this.modalData.title,
+                    description: this.modalData.description,
+                    deadline: this.modalData.deadline,
+                    createdAt: new Date(),
                     updatedAt: null,
                     status: null
                 };
                 this.addCard(card);
-                this.closeModal();
-            } else {
-                alert('Заполните все поля!');
             }
+
+            this.closeModal();
+        },
+        deleteCard(columnIndex, cardIndex) {
+            this.columns[columnIndex].cards.splice(cardIndex, 1);
+        },
+        editCard(columnIndex, cardIndex) {
+            const card = this.columns[columnIndex].cards[cardIndex];
+            this.modalData = {
+                title: card.title,
+                description: card.description,
+                deadline: card.deadline
+            };
+            this.editingCard = card;
+            this.isModalOpen = true;
         }
     }
 });
@@ -66,7 +113,8 @@ Vue.component('kanban-column', {
     props: {
         title: String,
         cards: Array,
-        isFirst: Boolean
+        isFirst: Boolean,
+        columnIndex: Number
     },
     template: `
         <div class="column">
@@ -77,6 +125,8 @@ Vue.component('kanban-column', {
                     v-for="(card, index) in cards"
                     :key="index"
                     :card="card"
+                    @delete="onDelete(index)"
+                    @edit="onEdit(index)"
                 ></kanban-card>
             </div>
         </div>
@@ -84,6 +134,12 @@ Vue.component('kanban-column', {
     methods: {
         openModal() {
             this.$emit('add-card');
+        },
+        onDelete(index) {
+            this.$emit('delete-card', this.columnIndex, index);
+        },
+        onEdit(index) {
+            this.$emit('edit-card', this.columnIndex, index);
         }
     }
 });
@@ -96,12 +152,15 @@ Vue.component('kanban-card', {
         <div class="card">
             <div class="card-header">
                 <h3>{{ card.title }}</h3>
+                <span class="sticker">{{ formattedDates }}</span>
             </div>
             <div class="card-body">
                 <p>{{ card.description }}</p>
+                <p v-if="card.updatedAt"><strong>Последнее изменение:</strong> {{ formatDate(card.updatedAt) }}</p>
             </div>
-            <div class="dedline">
-                <span>{{ formattedDates }}</span>
+            <div class="card-actions">
+                <button @click="$emit('edit')">Редактировать</button>
+                <button @click="$emit('delete')">Удалить</button>
             </div>
         </div>
     `,
@@ -116,7 +175,7 @@ Vue.component('kanban-card', {
         formatDate(date) {
             const d = new Date(date);
             const options = { day: 'numeric', month: 'short', year: 'numeric' };
-            return d.toLocaleDateString('ru-RU', options).replace('.', ''); // Убираем точку после месяца
+            return d.toLocaleDateString('ru-RU', options).replace('.', '');
         }
     }
 });
@@ -128,26 +187,40 @@ Vue.component('kanban-modal', {
     template: `
         <div class="modal-overlay">
             <div class="modal">
-                <h2>Создать карточку</h2>
+                <h2>{{ modalData.title ? 'Редактировать карточку' : 'Создать карточку' }}</h2>
                 <label>
                     Заголовок:
-                    <input type="text" v-model="modalData.title" placeholder="Введите заголовок">
+                    <input type="text" v-model="modalData.title" placeholder="Введите заголовок" class="modal-input">
                 </label>
                 <label>
                     Описание:
-                    <textarea v-model="modalData.description" placeholder="Введите описание"></textarea>
+                    <textarea v-model="modalData.description" placeholder="Введите описание" class="modal-textarea"></textarea>
                 </label>
                 <label>
                     Дедлайн:
-                    <input type="date" v-model="modalData.deadline">
+                    <input type="date" v-model="modalData.deadline" :min="minDate" class="modal-input">
                 </label>
                 <div class="modal-actions">
-                    <button @click="$emit('submit')">Сохранить</button>
-                    <button @click="$emit('close')">Отмена</button>
+                    <button @click="$emit('submit')" class="modal-button">Сохранить</button>
+                    <button @click="$emit('close')" class="modal-button">Отмена</button>
                 </div>
             </div>
         </div>
-    `
+    `,
+    data() {
+        return {
+            minDate: this.getTodayDate()
+        };
+    },
+    methods: {
+        getTodayDate() {
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const day = String(today.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+    }
 });
 
 let app = new Vue({
