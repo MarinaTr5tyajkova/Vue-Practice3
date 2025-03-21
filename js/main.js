@@ -42,6 +42,7 @@ Vue.component('kanban-board', {
                 title: '',
                 description: '',
                 deadline: '',
+                priority: '1', 
                 reason: ''
             },
             editingCard: null,
@@ -52,12 +53,14 @@ Vue.component('kanban-board', {
     methods: {
         addCard(card) {
             this.columns[0].cards.push(card);
+            this.sortAllColumnsByPriority(); 
         },
         openModal() {
             this.modalData = {
                 title: '',
                 description: '',
                 deadline: '',
+                priority: '1', 
                 reason: ''
             };
             this.editingCard = null;
@@ -69,6 +72,7 @@ Vue.component('kanban-board', {
                 title: '',
                 description: '',
                 deadline: '',
+                priority: '1', 
                 reason: ''
             };
         },
@@ -77,7 +81,6 @@ Vue.component('kanban-board', {
                 alert('Все поля должны быть заполнены!');
                 return;
             }
-
             const deadline = new Date(this.modalData.deadline);
             const today = new Date();
             if (deadline < today) {
@@ -91,15 +94,18 @@ Vue.component('kanban-board', {
                     title: this.modalData.title,
                     description: this.modalData.description,
                     deadline: this.modalData.deadline,
+                    priority: this.modalData.priority,
                     updatedAt: new Date()
                 });
                 Vue.set(this.columns[columnIndex].cards, cardIndex, updatedCard);
+                this.sortAllColumnsByPriority(); 
                 this.editingCard = null;
             } else {
                 const card = {
                     title: this.modalData.title,
                     description: this.modalData.description,
                     deadline: this.modalData.deadline,
+                    priority: this.modalData.priority,
                     createdAt: new Date(),
                     updatedAt: null,
                     status: null
@@ -112,12 +118,14 @@ Vue.component('kanban-board', {
             const columnIndex = this.columns.findIndex(column => column.cards.includes(card));
             const cardIndex = this.columns[columnIndex].cards.indexOf(card);
             this.columns[columnIndex].cards.splice(cardIndex, 1);
+            this.sortAllColumnsByPriority(); 
         },
         editCard(card) {
             this.modalData = {
                 title: card.title,
                 description: card.description,
                 deadline: card.deadline,
+                priority: card.priority, 
                 reason: ''
             };
             this.editingCard = card;
@@ -126,30 +134,25 @@ Vue.component('kanban-board', {
         moveCardRight(card) {
             const fromColumnIndex = this.columns.findIndex(column => column.cards.includes(card));
             const toColumnIndex = fromColumnIndex + 1;
-        
-            
             if (toColumnIndex === 3) { 
                 const today = new Date();
                 const deadline = new Date(card.deadline);
-        
-                
                 if (today > deadline) {
                     card.status = 'Просрочена'; 
                 } else {
-                    card.status = 'Выполнена в срок'; 
+                    card.status = 'Выполнено в срок'; 
                 }
             }
-
             if (toColumnIndex >= this.columns.length) {
                 alert('Нельзя переместить карточку дальше!');
                 return;
             }
-    
             const fromColumn = this.columns[fromColumnIndex];
             const toColumn = this.columns[toColumnIndex];
             const cardIndex = fromColumn.cards.indexOf(card);
             fromColumn.cards.splice(cardIndex, 1);
             toColumn.cards.push(card);
+            this.sortAllColumnsByPriority();
         },
         moveCardLeft(card) {
             const fromColumnIndex = this.columns.findIndex(column => column.cards.includes(card));
@@ -167,32 +170,15 @@ Vue.component('kanban-board', {
                 fromColumn.cards.splice(cardIndex, 1); 
                 toColumn.cards.unshift(card); 
             }
+            this.sortAllColumnsByPriority(); 
         },
-        openReturnModal(card) {
-            this.cardToReturn = card;
-            this.isReturnModalOpen = true;
+        sortAllColumnsByPriority() {
+            this.columns.forEach((column, index) => {
+                this.sortCardsByPriority(index);
+            });
         },
-        closeReturnModal() {
-            this.isReturnModalOpen = false;
-            this.modalData.reason = '';
-            this.cardToReturn = null;
-        },
-        submitReturn() {
-            if (!this.modalData.reason.trim()) {
-                alert('Укажите причину возврата!');
-                return;
-            }
-            const fromColumnIndex = this.columns.findIndex(column => column.cards.includes(this.cardToReturn));
-            const toColumnIndex = fromColumnIndex - 1;
-            const fromColumn = this.columns[fromColumnIndex];
-            const toColumn = this.columns[toColumnIndex];
-            const cardIndex = fromColumn.cards.indexOf(this.cardToReturn);
-        
-            this.cardToReturn.reason = this.modalData.reason;
-        
-            fromColumn.cards.splice(cardIndex, 1); 
-            toColumn.cards.unshift(this.cardToReturn); 
-            this.closeReturnModal();
+        sortCardsByPriority(columnIndex) {
+            this.columns[columnIndex].cards.sort((a, b) => a.priority - b.priority);
         }
     }
 });
@@ -229,11 +215,11 @@ Vue.component('kanban-card', {
         showLeftArrow: Boolean
     },
     template: `
-        <div class="card">
+        <div :class="['card', 'priority-' + card.priority]">
             <div class="card-header">
-                <h3>{{ card.title }}</h3>
                 <span class="sticker">{{ formattedDates }}</span>
             </div>
+            <div><h3>{{ card.title }}</h3></div>
             <div class="card-body">
                 <p>{{ card.description }}</p>
                 <p v-if="card.status"><strong>Статус:</strong> {{ card.status }}</p>
@@ -259,7 +245,6 @@ Vue.component('kanban-card', {
             return `${createdAt} – ${deadline}`;
         },
         isInDoneColumn() {
-            
             return this.$parent.$parent.columns[3].cards.includes(this.card);
         }
     },
@@ -300,6 +285,14 @@ Vue.component('kanban-modal', {
         <label>
           Дедлайн:
           <input type="date" v-model="modalData.deadline">
+        </label>
+        <label>
+          Приоритет:
+          <select v-model="modalData.priority">
+            <option value="1">Высший (1)</option>
+            <option value="2">Средний (2)</option>
+            <option value="3">Низший (3)</option>
+          </select>
         </label>
         <div class="modal-actions">
           <button @click="$emit('submit')">Сохранить</button>
