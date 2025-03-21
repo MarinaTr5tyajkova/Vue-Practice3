@@ -169,3 +169,10 @@ body {
 .modal-button:hover {
     background: #0056b3;
 }
+
+.move-icon {
+    width: 16px; 
+    height: 16px;
+    display: inline-block; 
+    cursor: pointer; 
+}

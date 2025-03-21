@@ -10,6 +10,7 @@ Vue.component('kanban-board', {
                 @add-card="openModal"
                 @delete-card="deleteCard"
                 @edit-card="editCard"
+                @move-card="moveCardRight"
             ></kanban-column>
 
             <kanban-modal
@@ -43,13 +44,12 @@ Vue.component('kanban-board', {
             this.columns[0].cards.push(card);
         },
         openModal() {
-            // Открываем модальное окно и сбрасываем данные
             this.modalData = {
                 title: '',
                 description: '',
                 deadline: ''
             };
-            this.editingCard = null; // Сбрасываем режим редактирования
+            this.editingCard = null;
             this.isModalOpen = true;
         },
         closeModal() {
@@ -118,6 +118,23 @@ Vue.component('kanban-board', {
             };
             this.editingCard = card;
             this.isModalOpen = true;
+        },
+        moveCardRight(card) {
+            const fromColumnIndex = this.columns.findIndex(column => column.cards.includes(card));
+            const toColumnIndex = fromColumnIndex + 1;
+
+            
+            if (toColumnIndex >= this.columns.length) {
+                alert('Нельзя переместить карточку дальше!');
+                return;
+            }
+
+            const fromColumn = this.columns[fromColumnIndex];
+            const toColumn = this.columns[toColumnIndex];
+
+            const cardIndex = fromColumn.cards.indexOf(card);
+            fromColumn.cards.splice(cardIndex, 1); 
+            toColumn.cards.push(card); 
         }
     }
 });
@@ -139,6 +156,7 @@ Vue.component('kanban-column', {
                     :card="card"
                     @delete="$emit('delete-card', card)"
                     @edit="$emit('edit-card', card)"
+                    @move="$emit('move-card', card)"
                 ></kanban-card>
             </div>
         </div>
@@ -173,6 +191,9 @@ Vue.component('kanban-card', {
             <div class="card-actions">
                 <button @click="$emit('edit')">Редактировать</button>
                 <button @click="$emit('delete')">Удалить</button>
+                <a @click="$emit('move')">
+                    <img src="./img/right_arrow.svg" alt="Переместить вправо" class="move-icon">
+                </a>
             </div>
         </div>
     `,
