@@ -7,7 +7,6 @@ Vue.component('kanban-board', {
                 :title="column.title"
                 :cards="column.cards"
                 :is-first="index === 0"
-                :column-index="index"
                 @add-card="openModal"
                 @delete-card="deleteCard"
                 @edit-card="editCard"
@@ -16,6 +15,7 @@ Vue.component('kanban-board', {
             <kanban-modal
                 v-if="isModalOpen" 
                 :modal-data="modalData" 
+                :is-editing="!!editingCard" 
                 @close="closeModal" 
                 @submit="submitModal"
             ></kanban-modal>
@@ -44,7 +44,7 @@ Vue.component('kanban-board', {
         },
         openModal() {
             this.modalData = { title: '', description: '', deadline: '' };
-            this.editingCard = null;
+            this.editingCard = null; 
             this.isModalOpen = true;
         },
         closeModal() {
@@ -68,7 +68,6 @@ Vue.component('kanban-board', {
                 const columnIndex = this.columns.findIndex(column => column.cards.includes(this.editingCard));
                 const cardIndex = this.columns[columnIndex].cards.indexOf(this.editingCard);
 
-                
                 Vue.set(this.columns[columnIndex].cards, cardIndex, {
                     ...this.editingCard,
                     title: this.modalData.title,
@@ -78,7 +77,6 @@ Vue.component('kanban-board', {
                 });
                 this.editingCard = null;
             } else {
-                
                 const card = {
                     title: this.modalData.title,
                     description: this.modalData.description,
@@ -92,17 +90,18 @@ Vue.component('kanban-board', {
 
             this.closeModal();
         },
-        deleteCard(columnIndex, cardIndex) {
+        deleteCard(card) {
+            const columnIndex = this.columns.findIndex(column => column.cards.includes(card));
+            const cardIndex = this.columns[columnIndex].cards.indexOf(card);
             this.columns[columnIndex].cards.splice(cardIndex, 1);
         },
-        editCard(columnIndex, cardIndex) {
-            const card = this.columns[columnIndex].cards[cardIndex];
+        editCard(card) {
             this.modalData = {
                 title: card.title,
                 description: card.description,
                 deadline: card.deadline
             };
-            this.editingCard = card;
+            this.editingCard = card; 
             this.isModalOpen = true;
         }
     }
@@ -112,20 +111,19 @@ Vue.component('kanban-column', {
     props: {
         title: String,
         cards: Array,
-        isFirst: Boolean,
-        columnIndex: Number
+        isFirst: Boolean
     },
     template: `
         <div class="column">
             <h2>{{ title }}</h2>
-            <span v-if="isFirst" class="add-task" @click="openModal">+ Добавить задачу</span>
+            <span v-if="isFirst" class="add-task" @click="$emit('add-card')">+ Добавить задачу</span>
             <div class="cards">
                 <kanban-card
                     v-for="(card, index) in cards"
                     :key="index"
                     :card="card"
-                    @delete="onDelete(index)"
-                    @edit="onEdit(index)"
+                    @delete="$emit('delete-card', card)"
+                    @edit="$emit('edit-card', card)"
                 ></kanban-card>
             </div>
         </div>
@@ -189,12 +187,13 @@ Vue.component('kanban-card', {
 
 Vue.component('kanban-modal', {
     props: {
-        modalData: Object
+        modalData: Object,
+        isEditing: Boolean 
     },
     template: `
         <div class="modal-overlay">
             <div class="modal">
-                <h2>{{ modalData.title ? 'Редактировать карточку' : 'Создать карточку' }}</h2>
+                <h2>{{ isEditing ? 'Редактировать карточку' : 'Создать карточку' }}</h2>
                 <label>
                     Заголовок:
                     <input type="text" v-model="modalData.title" placeholder="Введите заголовок" class="modal-input">
