@@ -126,20 +126,35 @@ Vue.component('kanban-board', {
         moveCardRight(card) {
             const fromColumnIndex = this.columns.findIndex(column => column.cards.includes(card));
             const toColumnIndex = fromColumnIndex + 1;
+        
+            
+            if (toColumnIndex === 3) { 
+                const today = new Date();
+                const deadline = new Date(card.deadline);
+        
+                
+                if (today > deadline) {
+                    card.status = 'Просрочена'; 
+                } else {
+                    card.status = 'Выполнена в срок'; 
+                }
+            }
+
             if (toColumnIndex >= this.columns.length) {
                 alert('Нельзя переместить карточку дальше!');
                 return;
             }
+    
             const fromColumn = this.columns[fromColumnIndex];
             const toColumn = this.columns[toColumnIndex];
             const cardIndex = fromColumn.cards.indexOf(card);
-            fromColumn.cards.splice(cardIndex, 1); 
-            toColumn.cards.push(card); 
+            fromColumn.cards.splice(cardIndex, 1);
+            toColumn.cards.push(card);
         },
         moveCardLeft(card) {
             const fromColumnIndex = this.columns.findIndex(column => column.cards.includes(card));
-            if (fromColumnIndex === 2) { // Если карточка находится в третьем столбце
-                this.openReturnModal(card); // Открываем модальное окно
+            if (fromColumnIndex === 2) { 
+                this.openReturnModal(card); 
             } else {
                 const toColumnIndex = fromColumnIndex - 1;
                 if (toColumnIndex < 0) {
@@ -172,6 +187,9 @@ Vue.component('kanban-board', {
             const fromColumn = this.columns[fromColumnIndex];
             const toColumn = this.columns[toColumnIndex];
             const cardIndex = fromColumn.cards.indexOf(this.cardToReturn);
+        
+            this.cardToReturn.reason = this.modalData.reason;
+        
             fromColumn.cards.splice(cardIndex, 1); 
             toColumn.cards.unshift(this.cardToReturn); 
             this.closeReturnModal();
@@ -217,10 +235,11 @@ Vue.component('kanban-card', {
                 <span class="sticker">{{ formattedDates }}</span>
             </div>
             <div class="card-body">
-                <p><strong>Описание:</strong> {{ card.description }}</p>
-                <p v-if="card.updatedAt"><strong>Последнее изменение:</strong> {{ formatDate(card.updatedAt, true) }}</p>
+                <p>{{ card.description }}</p>
+                <p v-if="card.status"><strong>Статус:</strong> {{ card.status }}</p>
+                <p v-if="card.reason"><strong>Причина возврата:</strong> {{ card.reason }}</p>
             </div>
-            <div class="card-actions">
+            <div class="card-actions" v-if="!isInDoneColumn">
                 <button @click="$emit('edit')">Редактировать</button>
                 <button @click="$emit('delete')">Удалить</button>
                 <a v-if="showLeftArrow" @click="$emit('move-left')" class="move-icon">
@@ -230,6 +249,7 @@ Vue.component('kanban-card', {
                     <img src="./img/right_arrow.svg" alt="Переместить вправо">
                 </a>
             </div>
+            <div><p v-if="card.updatedAt" class="last_change"><strong>Последнее изменение:</strong><br>{{ formatDate(card.updatedAt, true) }}</p></div>
         </div>
     `,
     computed: {
@@ -237,6 +257,10 @@ Vue.component('kanban-card', {
             const createdAt = this.formatDate(this.card.createdAt); 
             const deadline = this.formatDate(this.card.deadline); 
             return `${createdAt} – ${deadline}`;
+        },
+        isInDoneColumn() {
+            
+            return this.$parent.$parent.columns[3].cards.includes(this.card);
         }
     },
     methods: {
