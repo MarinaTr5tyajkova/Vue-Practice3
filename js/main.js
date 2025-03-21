@@ -10,9 +10,9 @@ Vue.component('kanban-board', {
                 @add-card="openModal"
                 @delete-card="deleteCard"
                 @edit-card="editCard"
-                @move-card="moveCardRight"
+                @move-card-right="moveCardRight"
+                @move-card-left="moveCardLeft"
             ></kanban-column>
-
             <kanban-modal
                 v-if="isModalOpen" 
                 :modal-data="modalData" 
@@ -20,6 +20,13 @@ Vue.component('kanban-board', {
                 @close="closeModal" 
                 @submit="submitModal"
             ></kanban-modal>
+            <return-reason-modal
+                v-if="isReturnModalOpen"
+                :value="modalData.reason" 
+                @input="modalData.reason = $event"
+                @close="closeReturnModal"
+                @submit="submitReturn"
+            ></return-reason-modal>
         </div>
     `,
     data() {
@@ -34,9 +41,12 @@ Vue.component('kanban-board', {
             modalData: {
                 title: '',
                 description: '',
-                deadline: ''
+                deadline: '',
+                reason: ''
             },
-            editingCard: null
+            editingCard: null,
+            isReturnModalOpen: false,
+            cardToReturn: null
         };
     },
     methods: {
@@ -47,7 +57,8 @@ Vue.component('kanban-board', {
             this.modalData = {
                 title: '',
                 description: '',
-                deadline: ''
+                deadline: '',
+                reason: ''
             };
             this.editingCard = null;
             this.isModalOpen = true;
@@ -57,17 +68,13 @@ Vue.component('kanban-board', {
             this.modalData = {
                 title: '',
                 description: '',
-                deadline: ''
+                deadline: '',
+                reason: ''
             };
         },
         submitModal() {
-            if (!this.modalData.title || !this.modalData.description || !this.modalData.deadline) {
-                alert('Заполните все поля!');
-                return;
-            }
-
-            if (this.modalData.title.split(' ').length > 1 || this.modalData.description.split(' ').length > 1) {
-                alert('Пробелы не допускаются в заголовке и описании!');
+            if (!this.modalData.title.trim() || !this.modalData.description.trim() || !this.modalData.deadline) {
+                alert('Все поля должны быть заполнены!');
                 return;
             }
 
@@ -77,18 +84,15 @@ Vue.component('kanban-board', {
                 alert('Дедлайн не может быть раньше текущей даты!');
                 return;
             }
-
             if (this.editingCard) {
                 const columnIndex = this.columns.findIndex(column => column.cards.includes(this.editingCard));
                 const cardIndex = this.columns[columnIndex].cards.indexOf(this.editingCard);
-
                 const updatedCard = Object.assign({}, this.editingCard, {
                     title: this.modalData.title,
                     description: this.modalData.description,
                     deadline: this.modalData.deadline,
                     updatedAt: new Date()
                 });
-
                 Vue.set(this.columns[columnIndex].cards, cardIndex, updatedCard);
                 this.editingCard = null;
             } else {
@@ -102,7 +106,6 @@ Vue.component('kanban-board', {
                 };
                 this.addCard(card);
             }
-
             this.closeModal();
         },
         deleteCard(card) {
@@ -114,7 +117,8 @@ Vue.component('kanban-board', {
             this.modalData = {
                 title: card.title,
                 description: card.description,
-                deadline: card.deadline
+                deadline: card.deadline,
+                reason: ''
             };
             this.editingCard = card;
             this.isModalOpen = true;
@@ -122,19 +126,55 @@ Vue.component('kanban-board', {
         moveCardRight(card) {
             const fromColumnIndex = this.columns.findIndex(column => column.cards.includes(card));
             const toColumnIndex = fromColumnIndex + 1;
-
-            
             if (toColumnIndex >= this.columns.length) {
                 alert('Нельзя переместить карточку дальше!');
                 return;
             }
-
             const fromColumn = this.columns[fromColumnIndex];
             const toColumn = this.columns[toColumnIndex];
-
             const cardIndex = fromColumn.cards.indexOf(card);
             fromColumn.cards.splice(cardIndex, 1); 
             toColumn.cards.push(card); 
+        },
+        moveCardLeft(card) {
+            const fromColumnIndex = this.columns.findIndex(column => column.cards.includes(card));
+            if (fromColumnIndex === 2) { // Если карточка находится в третьем столбце
+                this.openReturnModal(card); // Открываем модальное окно
+            } else {
+                const toColumnIndex = fromColumnIndex - 1;
+                if (toColumnIndex < 0) {
+                    alert('Нельзя переместить карточку назад!');
+                    return;
+                }
+                const fromColumn = this.columns[fromColumnIndex];
+                const toColumn = this.columns[toColumnIndex];
+                const cardIndex = fromColumn.cards.indexOf(card);
+                fromColumn.cards.splice(cardIndex, 1); 
+                toColumn.cards.unshift(card); 
+            }
+        },
+        openReturnModal(card) {
+            this.cardToReturn = card;
+            this.isReturnModalOpen = true;
+        },
+        closeReturnModal() {
+            this.isReturnModalOpen = false;
+            this.modalData.reason = '';
+            this.cardToReturn = null;
+        },
+        submitReturn() {
+            if (!this.modalData.reason.trim()) {
+                alert('Укажите причину возврата!');
+                return;
+            }
+            const fromColumnIndex = this.columns.findIndex(column => column.cards.includes(this.cardToReturn));
+            const toColumnIndex = fromColumnIndex - 1;
+            const fromColumn = this.columns[fromColumnIndex];
+            const toColumn = this.columns[toColumnIndex];
+            const cardIndex = fromColumn.cards.indexOf(this.cardToReturn);
+            fromColumn.cards.splice(cardIndex, 1); 
+            toColumn.cards.unshift(this.cardToReturn); 
+            this.closeReturnModal();
         }
     }
 });
@@ -154,29 +194,21 @@ Vue.component('kanban-column', {
                     v-for="(card, index) in cards"
                     :key="index"
                     :card="card"
+                    :show-left-arrow="!isFirst && title === 'Тестирование'"
                     @delete="$emit('delete-card', card)"
                     @edit="$emit('edit-card', card)"
-                    @move="$emit('move-card', card)"
+                    @move-right="$emit('move-card-right', card)"
+                    @move-left="$emit('move-card-left', card)"
                 ></kanban-card>
             </div>
         </div>
-    `,
-    methods: {
-        openModal() {
-            this.$emit('add-card');
-        },
-        onDelete(index) {
-            this.$emit('delete-card', this.columnIndex, index);
-        },
-        onEdit(index) {
-            this.$emit('edit-card', this.columnIndex, index);
-        }
-    }
+    `
 });
 
 Vue.component('kanban-card', {
     props: {
-        card: Object
+        card: Object,
+        showLeftArrow: Boolean
     },
     template: `
         <div class="card">
@@ -191,8 +223,11 @@ Vue.component('kanban-card', {
             <div class="card-actions">
                 <button @click="$emit('edit')">Редактировать</button>
                 <button @click="$emit('delete')">Удалить</button>
-                <a @click="$emit('move')">
-                    <img src="./img/right_arrow.svg" alt="Переместить вправо" class="move-icon">
+                <a v-if="showLeftArrow" @click="$emit('move-left')" class="move-icon">
+                    <img src="./img/left_arrow.svg" alt="Переместить влево">
+                </a>
+                <a @click="$emit('move-right')" class="move-icon">
+                    <img src="./img/right_arrow.svg" alt="Переместить вправо">
                 </a>
             </div>
         </div>
@@ -227,54 +262,58 @@ Vue.component('kanban-modal', {
         isEditing: Boolean 
     },
     template: `
-        <div class="modal-overlay">
-            <div class="modal">
-                <h2>{{ isEditing ? 'Редактировать карточку' : 'Создать карточку' }}</h2>
-                <label>
-                    Заголовок:
-                    <input type="text" 
-                        v-model="modalData.title" 
-                        placeholder="Введите заголовок" 
-                        class="modal-input"
-                        @input="removeSpaces('title')" />
-                </label>
-                <label>
-                    Описание:
-                    <textarea 
-                        v-model="modalData.description" 
-                        placeholder="Введите описание" 
-                        class="modal-textarea"
-                        @input="removeSpaces('description')"></textarea>
-                </label>
-                <label>
-                    Дедлайн:
-                    <input type="date" 
-                        v-model="modalData.deadline" 
-                        :min="minDate" 
-                        class="modal-input" />
-                </label>
-                <div class="modal-actions">
-                    <button @click="$emit('submit')" class="modal-button">Сохранить</button>
-                    <button @click="$emit('close')" class="modal-button">Отмена</button>
-                </div>
-            </div>
+    <div class="modal-overlay">
+      <div class="modal">
+        <h2>{{ isEditing ? 'Редактировать карточку' : 'Создать задачу' }}</h2>
+        <label>
+          Заголовок:
+          <input v-model="modalData.title" placeholder="Введите заголовок" required>
+        </label>
+        <label>
+          Описание:
+          <textarea v-model="modalData.description" placeholder="Введите описание"></textarea>
+        </label>
+        <label>
+          Дедлайн:
+          <input type="date" v-model="modalData.deadline">
+        </label>
+        <div class="modal-actions">
+          <button @click="$emit('submit')">Сохранить</button>
+          <button @click="$emit('close')">Отмена</button>
         </div>
+      </div>
+    </div>
+  `
+});
+
+Vue.component('return-reason-modal', {
+    props: ['value'], 
+    template: `
+      <div class="modal-overlay">
+        <div class="modal">
+          <h2>Укажите причину возврата</h2>
+          <label>
+            Причина:
+            <textarea 
+                v-model="internalReason" 
+                placeholder="Введите причину"
+                @input="$emit('input', $event.target.value)"></textarea>
+          </label>
+          <div class="modal-actions">
+            <button @click="$emit('submit')">Сохранить</button>
+            <button @click="$emit('close')">Отмена</button>
+          </div>
+        </div>
+      </div>
     `,
     data() {
         return {
-            minDate: this.getTodayDate()
+            internalReason: this.value 
         };
     },
-    methods: {
-        getTodayDate() {
-            const today = new Date();
-            const year = today.getFullYear();
-            const month = String(today.getMonth() + 1).padStart(2, '0');
-            const day = String(today.getDate()).padStart(2, '0');
-            return `${year}-${month}-${day}`;
-        },
-        removeSpaces(field) {
-            this.modalData[field] = this.modalData[field].replace(/\s+/g, '');
+    watch: {
+        value(newVal) {
+            this.internalReason = newVal;
         }
     }
 });
