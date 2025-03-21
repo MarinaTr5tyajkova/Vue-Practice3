@@ -43,17 +43,31 @@ Vue.component('kanban-board', {
             this.columns[0].cards.push(card);
         },
         openModal() {
-            this.modalData = { title: '', description: '', deadline: '' };
-            this.editingCard = null; 
+            // Открываем модальное окно и сбрасываем данные
+            this.modalData = {
+                title: '',
+                description: '',
+                deadline: ''
+            };
+            this.editingCard = null; // Сбрасываем режим редактирования
             this.isModalOpen = true;
         },
         closeModal() {
             this.isModalOpen = false;
-            this.modalData = { title: '', description: '', deadline: '' };
+            this.modalData = {
+                title: '',
+                description: '',
+                deadline: ''
+            };
         },
         submitModal() {
             if (!this.modalData.title || !this.modalData.description || !this.modalData.deadline) {
                 alert('Заполните все поля!');
+                return;
+            }
+
+            if (this.modalData.title.split(' ').length > 1 || this.modalData.description.split(' ').length > 1) {
+                alert('Пробелы не допускаются в заголовке и описании!');
                 return;
             }
 
@@ -68,13 +82,14 @@ Vue.component('kanban-board', {
                 const columnIndex = this.columns.findIndex(column => column.cards.includes(this.editingCard));
                 const cardIndex = this.columns[columnIndex].cards.indexOf(this.editingCard);
 
-                Vue.set(this.columns[columnIndex].cards, cardIndex, {
-                    ...this.editingCard,
+                const updatedCard = Object.assign({}, this.editingCard, {
                     title: this.modalData.title,
                     description: this.modalData.description,
                     deadline: this.modalData.deadline,
                     updatedAt: new Date()
                 });
+
+                Vue.set(this.columns[columnIndex].cards, cardIndex, updatedCard);
                 this.editingCard = null;
             } else {
                 const card = {
@@ -101,7 +116,7 @@ Vue.component('kanban-board', {
                 description: card.description,
                 deadline: card.deadline
             };
-            this.editingCard = card; 
+            this.editingCard = card;
             this.isModalOpen = true;
         }
     }
@@ -196,15 +211,26 @@ Vue.component('kanban-modal', {
                 <h2>{{ isEditing ? 'Редактировать карточку' : 'Создать карточку' }}</h2>
                 <label>
                     Заголовок:
-                    <input type="text" v-model="modalData.title" placeholder="Введите заголовок" class="modal-input">
+                    <input type="text" 
+                        v-model="modalData.title" 
+                        placeholder="Введите заголовок" 
+                        class="modal-input"
+                        @input="removeSpaces('title')" />
                 </label>
                 <label>
                     Описание:
-                    <textarea v-model="modalData.description" placeholder="Введите описание" class="modal-textarea"></textarea>
+                    <textarea 
+                        v-model="modalData.description" 
+                        placeholder="Введите описание" 
+                        class="modal-textarea"
+                        @input="removeSpaces('description')"></textarea>
                 </label>
                 <label>
                     Дедлайн:
-                    <input type="date" v-model="modalData.deadline" :min="minDate" class="modal-input">
+                    <input type="date" 
+                        v-model="modalData.deadline" 
+                        :min="minDate" 
+                        class="modal-input" />
                 </label>
                 <div class="modal-actions">
                     <button @click="$emit('submit')" class="modal-button">Сохранить</button>
@@ -225,6 +251,9 @@ Vue.component('kanban-modal', {
             const month = String(today.getMonth() + 1).padStart(2, '0');
             const day = String(today.getDate()).padStart(2, '0');
             return `${year}-${month}-${day}`;
+        },
+        removeSpaces(field) {
+            this.modalData[field] = this.modalData[field].replace(/\s+/g, '');
         }
     }
 });
