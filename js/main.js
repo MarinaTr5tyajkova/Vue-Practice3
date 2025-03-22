@@ -179,6 +179,40 @@ Vue.component('kanban-board', {
         },
         sortCardsByPriority(columnIndex) {
             this.columns[columnIndex].cards.sort((a, b) => a.priority - b.priority);
+        },
+        openReturnModal(card) {
+            this.cardToReturn = card;
+            this.modalData.reason = '';
+            this.isReturnModalOpen = true;
+        },
+        closeReturnModal() {
+            this.isReturnModalOpen = false;
+            this.modalData.reason = '';
+        },
+        submitReturn() {
+            if (!this.modalData.reason.trim()) {
+                alert('Укажите причину возврата!');
+                return;
+            }
+
+            const fromColumnIndex = this.columns.findIndex(column => 
+                column.cards.includes(this.cardToReturn)
+            );
+            
+            if (fromColumnIndex === 2) {
+                const cardIndex = this.columns[fromColumnIndex].cards.indexOf(this.cardToReturn);
+                
+                const updatedCard = { 
+                    ...this.cardToReturn, 
+                    reason: this.modalData.reason 
+                };
+                
+                this.columns[fromColumnIndex].cards.splice(cardIndex, 1);
+                this.columns[1].cards.unshift(updatedCard);
+                this.sortAllColumnsByPriority();
+            }
+
+            this.closeReturnModal();
         }
     }
 });
